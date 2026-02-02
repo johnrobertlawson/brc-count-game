@@ -15,9 +15,11 @@
   <div id="round-indicator"></div>
 </header>
 
+<!-- ROUND SPLASH OVERLAY (hidden by default) -->
+<div id="round-splash" class="hidden" onclick="dismissSplash()"></div>
+
 <!-- MAIN GAME AREA -->
 <main id="game-area">
-  <!-- Lobby / between rounds -->
   <div id="screen-lobby" class="screen active">
     <h2 class="neon-text">Ready</h2>
     <div id="lobby-controls"></div>
@@ -66,24 +68,70 @@
   </div>
 </main>
 
-<!-- RULES SIDEBAR -->
-<aside id="rules-panel" class="collapsed">
+<!-- RULES SIDEBAR (open by default) -->
+<aside id="rules-panel">
   <button id="rules-toggle" onclick="toggleRules()">Rules</button>
   <div class="rules-content">
-    <h3>Letters</h3>
+    <div class="difficulty-badge" id="difficulty-badge"></div>
+    <h3><span class="rules-icon">ABC</span> Letters</h3>
     <p>Pick 9 letters. Make the longest word. Score = word length. Winner gets a bonus.</p>
-    <h3>Numbers</h3>
-    <p>Pick 6 numbers. Hit the target using +, -, *, /. Exact=10pts, within 5=7pts, within 10=5pts.</p>
-    <h3>Conundrum</h3>
+    <h3><span class="rules-icon">#</span> Numbers</h3>
+    <p>Pick 6 numbers. Hit the target using +, -, *, /.<br>
+       Exact = 10 pts<br>Within 5 = 7 pts<br>Within 10 = 5 pts<br>Within 20 = 3 pts</p>
+    <h3><span class="rules-icon">?</span> Conundrum</h3>
     <p>Unscramble the anagram. First to buzz in wins 10 points.</p>
   </div>
 </aside>
+
+<!-- SOUND TOGGLE -->
+<button id="sound-toggle" onclick="toggleSound()" title="Toggle sound">&#9834;</button>
 
 <script>
 // --- State ---
 let state = {};
 let timerInterval = null;
 let timerSeconds = 45;
+let soundEnabled = false;
+let splashTimeout = null;
+let currentTarget = null; // for live distance
+
+// --- Audio (Web Audio API for generated tones) ---
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTick() {
+  if (!soundEnabled) return;
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.frequency.value = 800;
+  osc.type = 'sine';
+  gain.gain.value = 0.08;
+  osc.start(); osc.stop(ctx.currentTime + 0.05);
+}
+
+function playBuzzer() {
+  if (!soundEnabled) return;
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.frequency.value = 220;
+  osc.type = 'square';
+  gain.gain.value = 0.15;
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+  osc.start(); osc.stop(ctx.currentTime + 0.6);
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  document.getElementById('sound-toggle').classList.toggle('active', soundEnabled);
+  if (soundEnabled) getAudioCtx(); // init on user gesture
+}
 
 // --- Init ---
 async function init() {
@@ -94,6 +142,9 @@ async function init() {
     return;
   }
   timerSeconds = state.settings?.timer_seconds || 45;
+  const macro = state.settings?.macro || 'medium';
+  const badge = document.getElementById('difficulty-badge');
+  badge.textContent = macro.charAt(0).toUpperCase() + macro.slice(1) + ' Mode';
   renderScoreboard();
   showLobby();
 }
@@ -130,6 +181,43 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+// ========== ROUND SPLASH ==========
+const SPLASH_INFO = {
+  letters: {
+    label: 'Letters Round',
+    scoring: 'Longest word wins.<br>Score = <strong>word length</strong>. Winner gets a <strong>bonus</strong>!'
+  },
+  numbers: {
+    label: 'Numbers Round',
+    scoring: 'Hit the target!<br>Exact = <strong>10</strong> | Within 5 = <strong>7</strong> | Within 10 = <strong>5</strong> | Within 20 = <strong>3</strong>'
+  },
+  conundrum: {
+    label: 'Conundrum',
+    scoring: 'Unscramble the anagram.<br>First to solve wins <strong>10 points</strong>!'
+  }
+};
+
+function showSplash(type, onDone) {
+  const info = SPLASH_INFO[type];
+  const macro = state.settings?.macro || 'medium';
+  const diffLabel = macro.charAt(0).toUpperCase() + macro.slice(1);
+  const el = document.getElementById('round-splash');
+  el.innerHTML = `
+    <div class="splash-type">${info.label}</div>
+    <div class="splash-difficulty">${diffLabel} Mode</div>
+    <div class="splash-scoring">${info.scoring}</div>
+    <div class="splash-hint">Click anywhere to continue</div>
+  `;
+  el.classList.remove('hidden');
+  el.onclick = () => { dismissSplash(); onDone(); };
+  splashTimeout = setTimeout(() => { dismissSplash(); onDone(); }, 5000);
+}
+
+function dismissSplash() {
+  document.getElementById('round-splash').classList.add('hidden');
+  if (splashTimeout) { clearTimeout(splashTimeout); splashTimeout = null; }
+}
+
 // --- Lobby ---
 function showLobby() {
   const ctrl = document.getElementById('lobby-controls');
@@ -162,7 +250,7 @@ function showLobby() {
   showScreen('screen-lobby');
 }
 
-// --- Start round ---
+// --- Start round (with splash) ---
 async function startRound(type) {
   const resp = await fetch('/api/start_round', {
     method: 'POST',
@@ -172,9 +260,11 @@ async function startRound(type) {
   const data = await resp.json();
   state.current_round = data.round;
 
-  if (type === 'letters') initLettersRound();
-  else if (type === 'numbers') initNumbersRound();
-  else if (type === 'conundrum') initConundrumRound();
+  showSplash(type, () => {
+    if (type === 'letters') initLettersRound();
+    else if (type === 'numbers') initNumbersRound();
+    else if (type === 'conundrum') initConundrumRound();
+  });
 }
 
 // ========== LETTERS ROUND ==========
@@ -216,7 +306,6 @@ function showLettersSubmit() {
       `<div class="submit-row"><label>${esc(t)}:</label><input type="text" id="word-${esc(t)}" class="word-input" maxlength="9" autocomplete="off"></div>`
     ).join('') +
     `<button class="btn-neon" onclick="submitLetters()">Score</button>`;
-  // Focus first input
   const firstInput = area.querySelector('.word-input');
   if (firstInput) firstInput.focus();
 }
@@ -247,14 +336,30 @@ function showLettersResults(results) {
     const cls = r.valid ? 'valid' : 'invalid';
     const err = r.error ? ` <span class="err">(${r.error})</span>` : '';
     const bonus = r.bonus > 0 ? ` <span class="bonus">+${r.bonus} bonus</span>` : '';
-    html += `<div class="result-row ${cls}">
+    const override = (!r.valid && r.word && r.word !== '-')
+      ? ` <button class="btn-neon btn-override" onclick="overrideWord('${esc(team)}')">Override</button>`
+      : '';
+    html += `<div class="result-row ${cls}" id="result-row-${esc(team)}">
       <span class="team-name">${esc(team)}</span>
-      <span class="result-word">${esc(r.word || '-')}${err}</span>
+      <span class="result-word">${esc(r.word || '-')}${err}${override}</span>
       <span class="result-score">${r.total}${bonus}</span>
     </div>`;
   }
   html += '</div><button class="btn-neon" onclick="nextRound()">Continue</button>';
   area.innerHTML = html;
+}
+
+async function overrideWord(team) {
+  const resp = await fetch('/api/override_word', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({team})
+  });
+  const data = await resp.json();
+  if (data.error) return;
+  state.scores = data.scores;
+  updateScores();
+  showLettersResults(data.results);
 }
 
 // ========== NUMBERS ROUND ==========
@@ -265,6 +370,7 @@ function initNumbersRound() {
   document.getElementById('numbers-pick').classList.remove('hidden');
   document.getElementById('numbers-submit').classList.add('hidden');
   document.getElementById('numbers-results').classList.add('hidden');
+  currentTarget = null;
   showScreen('screen-numbers');
 }
 
@@ -276,8 +382,8 @@ async function drawNumbers() {
     body: JSON.stringify({large_count: lc})
   });
   const data = await resp.json();
+  currentTarget = data.target;
   renderNumberTiles(data.numbers);
-  // Show target with dramatic reveal
   document.getElementById('numbers-target').innerHTML = `<span class="target-label">TARGET</span><span class="target-number">${data.target}</span>`;
   document.getElementById('numbers-pick').classList.add('hidden');
   startTimer('numbers-timer', () => showNumbersSubmit());
@@ -296,11 +402,50 @@ function showNumbersSubmit() {
   area.innerHTML = `<h3>Enter expressions</h3>
     <p class="hint">Use +, -, *, / and parentheses. E.g. (75+50)*8+2</p>` +
     state.teams.map(t =>
-      `<div class="submit-row"><label>${esc(t)}:</label><input type="text" id="expr-${esc(t)}" class="expr-input" autocomplete="off" placeholder="e.g. (100+25)*4"></div>`
+      `<div class="submit-row">
+        <label>${esc(t)}:</label>
+        <div style="flex:1">
+          <input type="text" id="expr-${esc(t)}" class="expr-input" autocomplete="off" placeholder="e.g. (100+25)*4" oninput="updateLiveDistance('${esc(t)}')">
+          <div class="live-distance" id="dist-${esc(t)}"></div>
+        </div>
+      </div>`
     ).join('') +
     `<button class="btn-neon" onclick="submitNumbers()">Verify & Score</button>`;
   const firstInput = area.querySelector('.expr-input');
   if (firstInput) firstInput.focus();
+}
+
+// --- Live distance display ---
+function safeEvalExpr(str) {
+  // Client-side quick eval for live feedback only (not authoritative)
+  try {
+    // Allow only digits, operators, parens, spaces
+    if (!/^[\d+\-*/() .]+$/.test(str)) return null;
+    const result = Function('"use strict"; return (' + str + ')')();
+    if (typeof result === 'number' && isFinite(result)) return Math.round(result);
+  } catch(e) {}
+  return null;
+}
+
+function updateLiveDistance(team) {
+  const inp = document.getElementById(`expr-${esc(team)}`);
+  const el = document.getElementById(`dist-${esc(team)}`);
+  if (!inp || !el || currentTarget === null) return;
+  const val = inp.value.trim();
+  if (!val) { el.textContent = ''; el.className = 'live-distance'; return; }
+  const result = safeEvalExpr(val);
+  if (result === null) {
+    el.textContent = '...';
+    el.className = 'live-distance dist-error';
+    return;
+  }
+  const diff = Math.abs(result - currentTarget);
+  let cls = 'dist-far';
+  if (diff === 0) cls = 'dist-exact';
+  else if (diff <= 10) cls = 'dist-close';
+  else if (diff <= 20) cls = 'dist-mid';
+  el.textContent = `= ${result} (${diff === 0 ? 'EXACT!' : diff + ' away'})`;
+  el.className = 'live-distance ' + cls;
 }
 
 async function submitNumbers() {
@@ -350,19 +495,15 @@ function initConundrumRound() {
   document.getElementById('conundrum-buzz').classList.remove('hidden');
   document.getElementById('conundrum-results').classList.add('hidden');
 
-  // Buzz-in buttons
   const buzz = document.getElementById('conundrum-buzz');
-  buzz.innerHTML = `<h3>First to solve — click their button!</h3>` +
+  buzz.innerHTML = `<h3>First to solve -- click their button!</h3>` +
     state.teams.map(t =>
       `<button class="btn-neon btn-buzz" onclick="buzzConundrum('${esc(t)}')">${esc(t)}</button>`
     ).join('') +
     `<button class="btn-neon btn-nobuzz" onclick="buzzConundrum(null)">No one solved it</button>`;
 
   showScreen('screen-conundrum');
-  startTimer('conundrum-timer', () => {
-    // Time's up — no one buzzed
-    buzzConundrum(null);
-  });
+  startTimer('conundrum-timer', () => buzzConundrum(null));
 }
 
 async function buzzConundrum(team) {
@@ -404,12 +545,14 @@ function startTimer(elementId, onFinish) {
   timerInterval = setInterval(() => {
     remaining--;
     el.textContent = remaining;
+    playTick();
     if (remaining <= 10) el.classList.add('timer-warning');
     if (remaining <= 5) el.classList.add('timer-critical');
     if (remaining <= 0) {
       clearTimer();
       el.textContent = "TIME";
       el.classList.add('timer-done');
+      playBuzzer();
       onFinish();
     }
   }, 1000);
