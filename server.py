@@ -15,11 +15,12 @@ from game_engine import (
     create_consonant_pool, create_vowel_pool, draw_letter, draw_numbers,
     create_number_pools, generate_target, verify_expression,
     score_letters_round, score_numbers_round, score_conundrum,
-    generate_anagram, generate_easy_anagram,
+    generate_anagram, generate_easy_anagram, solve_numbers,
 )
 from word_list import (
     load_dictionary, is_valid_word, can_make_word,
     get_conundrum_words, get_easy_conundrum_words,
+    find_best_words, find_rarest_word,
 )
 
 BASE = Path(__file__).parent
@@ -109,6 +110,8 @@ class GameHandler(SimpleHTTPRequestHandler):
             self._handle_validate_word(body)
         elif path == '/api/next_round':
             self._handle_next_round(body)
+        elif path == '/api/buzz_conundrum':
+            self._handle_buzz_conundrum(body)
         elif path == '/api/override_word':
             self._handle_override_word(body)
         else:
@@ -152,9 +155,12 @@ class GameHandler(SimpleHTTPRequestHandler):
                 anagram = generate_easy_anagram(word)
             else:
                 anagram = generate_anagram(word)
+            lives_mode = game_state['settings'].get('conundrum_lives', False)
+            lives = {t: 5 for t in game_state['teams']} if lives_mode else {}
             game_state['current_round'] = {
                 'type': 'conundrum', 'word': word, 'anagram': anagram,
                 'phase': 'playing', 'solved_by': None,
+                'lives_mode': lives_mode, 'lives': lives,
             }
         self._json_response({'ok': True, 'round': game_state['current_round']})
 
@@ -234,10 +240,27 @@ class GameHandler(SimpleHTTPRequestHandler):
         for team, r in results.items():
             game_state['scores'][team] = game_state['scores'].get(team, 0) + r['total']
 
+        # Dictionary Geeks Club: find best and rarest words
+        best_word_info = find_best_words(available, dictionary)
+        rarest_word_info = find_rarest_word(
+            available, dictionary,
+            exclude_word=best_word_info.get('word'),
+        )
+        reveal = {
+            'best_word': best_word_info,
+            'rarest_word': rarest_word_info,
+            'available_letters': [l.lower() for l in available],
+        }
+        rnd['reveal'] = reveal
+
         rnd['results'] = results
         rnd['phase'] = 'scored'
         game_state['round_history'].append(dict(rnd))
-        self._json_response({'results': results, 'scores': game_state['scores']})
+        self._json_response({
+            'results': results,
+            'scores': game_state['scores'],
+            'reveal': reveal,
+        })
 
     def _handle_submit_numbers(self, body: dict):
         submissions = body.get('submissions', {})
@@ -281,10 +304,18 @@ class GameHandler(SimpleHTTPRequestHandler):
         for team, r in results.items():
             game_state['scores'][team] = game_state['scores'].get(team, 0) + r['score']
 
+        # Compute best possible solution
+        best_solution = solve_numbers(available, target)
+        rnd['best_solution'] = best_solution
+
         rnd['results'] = results
         rnd['phase'] = 'scored'
         game_state['round_history'].append(dict(rnd))
-        self._json_response({'results': results, 'scores': game_state['scores']})
+        self._json_response({
+            'results': results,
+            'scores': game_state['scores'],
+            'best_solution': best_solution,
+        })
 
     def _handle_submit_conundrum(self, body: dict):
         winning_team = body.get('team')
@@ -306,6 +337,40 @@ class GameHandler(SimpleHTTPRequestHandler):
             'results': results, 'scores': game_state['scores'],
             'answer': rnd['word'],
         })
+
+    def _handle_buzz_conundrum(self, body: dict):
+        team = body.get('team', '')
+        guess = body.get('guess', '').strip().lower()
+        rnd = game_state.get('current_round')
+        if not rnd or rnd['type'] != 'conundrum':
+            self._json_response({'error': 'No conundrum round active'}, 400)
+            return
+        if not rnd.get('lives_mode'):
+            self._json_response({'error': 'Lives mode not enabled'}, 400)
+            return
+        lives = rnd.get('lives', {})
+        if lives.get(team, 0) <= 0:
+            self._json_response({'error': 'No lives remaining', 'correct': False, 'lives': lives})
+            return
+        if guess == rnd['word']:
+            # Correct!
+            rnd['solved_by'] = team
+            results = score_conundrum(team, game_state['teams'])
+            for t, pts in results.items():
+                game_state['scores'][t] = game_state['scores'].get(t, 0) + pts
+            rnd['results'] = results
+            rnd['phase'] = 'scored'
+            game_state['round_history'].append(dict(rnd))
+            self._json_response({
+                'correct': True, 'answer': rnd['word'],
+                'results': results, 'scores': game_state['scores'],
+            })
+        else:
+            lives[team] = lives.get(team, 0) - 1
+            rnd['lives'] = lives
+            self._json_response({
+                'correct': False, 'lives': lives,
+            })
 
     def _handle_validate_word(self, body: dict):
         word = body.get('word', '').strip().lower()
