@@ -17,6 +17,7 @@
 
 ### Conundrum
 - First team to solve: **10 pts**
+- **Easy mode** uses lives: each team gets 5 lives, buzz in and type your guess. Wrong answer = lose a life. Clock keeps ticking. Custom mode has a toggle for this.
 
 ## Expression syntax (Numbers round)
 
@@ -35,9 +36,19 @@ The server verifies the expression is valid and computes the result.
 | Setting | Easy | Medium | Hard |
 |---------|------|--------|------|
 | Timer | 60s | 45s | 30s |
-| Letters rounds | 4 | 5 | 6 |
-| Numbers rounds | 1 | 2 | 2 |
-| Conundrum rounds | 1 | 1 | 1 |
+| Conundrum lives | Yes | No | No |
+
+Difficulty controls the rules, not the number of rounds.
+
+## Game length
+
+| Setting | Letters | Numbers | Conundrums | Total |
+|---------|---------|---------|------------|-------|
+| Quick | 2 | 1 | 1 | 4 |
+| Standard | 5 | 2 | 1 | 8 |
+| Long | 8 | 3 | 2 | 13 |
+
+Game length is independent of difficulty: pick "Easy + Quick" for a gentle short game, or "Hard + Long" for a marathon.
 
 Custom mode: set each parameter individually.
 
@@ -62,6 +73,16 @@ A random 9-letter word scrambled into an anagram. Default length 9; adjustable i
 
 On **Easy** mode, conundrum words are filtered to common, recognisable words (no rare letters) and the scramble keeps a few letters in place. On **Hard**, any word and a fully random scramble.
 
+## After each round
+
+**Numbers round**: After scoring, the **Best Possible** solution is computed and displayed — the optimal expression the computer found using the same 6 numbers. Used tiles are highlighted.
+
+**Letters round**: **The Dictionary Geeks Club** reveals two words:
+- **Best Word**: the longest valid word makeable from the 9 letters
+- **Rare Find**: the word with the highest Scrabble letter value (words with unusual letters like Q, X, Z, J score higher)
+
+Both use mini-tiles showing which letters/numbers were used and which weren't.
+
 ## Tips for hosting
 
 - Go fullscreen (F11) on the `/host` page for projector display
@@ -70,3 +91,4 @@ On **Easy** mode, conundrum words are filtered to common, recognisable words (no
 - If a word isn't in the dictionary but the group agrees it's valid, click the **Override** button next to it in the results. Or toggle auto-check off in setup.
 - Sound effects (tick + buzzer) are off by default. Click the music note icon in the bottom-left to toggle.
 - During numbers expression entry, a live distance readout shows how close each expression is to the target as you type.
+- Number tiles dim as you use them in the expression, so you can see which numbers are still available.
