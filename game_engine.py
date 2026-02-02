@@ -206,6 +206,91 @@ def generate_anagram(word: str) -> str:
     return ''.join(reversed(letters))
 
 
+def solve_numbers(numbers: list[int], target: int) -> dict:
+    """Find the expression closest to target using available numbers.
+
+    Recursive pair-combination: pick any two numbers, combine with an
+    operation, recurse on the reduced pool. Tracks the best (closest)
+    result found. Early-exits on exact match.
+    """
+    best = {'diff': float('inf'), 'expr': '', 'result': 0, 'found': False}
+
+    def _solve(pool: list[tuple[int, str]]):
+        # Check every value in the pool against the target
+        for val, expr in pool:
+            diff = abs(val - target)
+            if diff < best['diff']:
+                best['diff'] = diff
+                best['expr'] = expr
+                best['result'] = val
+                if diff == 0:
+                    best['found'] = True
+                    return
+
+        if len(pool) < 2:
+            return
+
+        for i in range(len(pool)):
+            for j in range(i + 1, len(pool)):
+                a_val, a_expr = pool[i]
+                b_val, b_expr = pool[j]
+                rest = [pool[k] for k in range(len(pool)) if k != i and k != j]
+
+                candidates = []
+
+                # Addition (commutative — one direction)
+                candidates.append((a_val + b_val, f"({a_expr} + {b_expr})"))
+
+                # Subtraction (both directions, skip zero result)
+                if a_val > b_val:
+                    candidates.append((a_val - b_val, f"({a_expr} - {b_expr})"))
+                elif b_val > a_val:
+                    candidates.append((b_val - a_val, f"({b_expr} - {a_expr})"))
+
+                # Multiplication (commutative, skip ×1)
+                if a_val != 1 and b_val != 1:
+                    candidates.append((a_val * b_val, f"({a_expr} * {b_expr})"))
+
+                # Division (both directions, exact only, skip ÷1)
+                if b_val > 1 and a_val % b_val == 0:
+                    candidates.append((a_val // b_val, f"({a_expr} / {b_expr})"))
+                if a_val > 1 and b_val % a_val == 0:
+                    candidates.append((b_val // a_val, f"({b_expr} / {a_expr})"))
+
+                for new_val, new_expr in candidates:
+                    if new_val <= 0:
+                        continue
+                    _solve(rest + [(new_val, new_expr)])
+                    if best['found']:
+                        return
+
+    _solve([(n, str(n)) for n in numbers])
+
+    # Strip outermost parentheses from final expression
+    expr = best['expr']
+    if expr.startswith('(') and expr.endswith(')'):
+        # Verify balanced — only strip if these are the matching pair
+        depth = 0
+        matched = True
+        for k, ch in enumerate(expr):
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+            if depth == 0 and k < len(expr) - 1:
+                matched = False
+                break
+        if matched:
+            expr = expr[1:-1]
+
+    return {
+        'expression': expr,
+        'result': best['result'],
+        'diff': best['diff'],
+        'exact': best['diff'] == 0,
+    }
+
+
 def generate_easy_anagram(word: str) -> str:
     """Kinder scramble: keeps 2-3 letters in their original position."""
     letters = list(word)
