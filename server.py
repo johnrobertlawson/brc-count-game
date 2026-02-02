@@ -15,9 +15,12 @@ from game_engine import (
     create_consonant_pool, create_vowel_pool, draw_letter, draw_numbers,
     create_number_pools, generate_target, verify_expression,
     score_letters_round, score_numbers_round, score_conundrum,
-    generate_anagram,
+    generate_anagram, generate_easy_anagram,
 )
-from word_list import load_dictionary, is_valid_word, can_make_word, get_conundrum_words
+from word_list import (
+    load_dictionary, is_valid_word, can_make_word,
+    get_conundrum_words, get_easy_conundrum_words,
+)
 
 BASE = Path(__file__).parent
 TEMPLATES = BASE / 'templates'
@@ -106,6 +109,8 @@ class GameHandler(SimpleHTTPRequestHandler):
             self._handle_validate_word(body)
         elif path == '/api/next_round':
             self._handle_next_round(body)
+        elif path == '/api/override_word':
+            self._handle_override_word(body)
         else:
             self.send_error(404)
 
@@ -133,11 +138,20 @@ class GameHandler(SimpleHTTPRequestHandler):
             }
         elif rtype == 'conundrum':
             length = game_state['settings'].get('conundrum_length', 9)
-            candidates = get_conundrum_words(dictionary, length)
+            macro = game_state['settings'].get('macro', 'medium')
+            if macro == 'easy':
+                candidates = get_easy_conundrum_words(dictionary, length)
+            else:
+                candidates = get_conundrum_words(dictionary, length)
             if not candidates:
                 candidates = conundrum_words
             word = random.choice(candidates)
-            anagram = generate_anagram(word)
+            if macro == 'easy':
+                anagram = generate_easy_anagram(word)
+            elif macro == 'medium':
+                anagram = generate_easy_anagram(word)
+            else:
+                anagram = generate_anagram(word)
             game_state['current_round'] = {
                 'type': 'conundrum', 'word': word, 'anagram': anagram,
                 'phase': 'playing', 'solved_by': None,
@@ -250,6 +264,8 @@ class GameHandler(SimpleHTTPRequestHandler):
                     pts = 7
                 elif diff <= 10:
                     pts = 5
+                elif diff <= 20:
+                    pts = 3
                 else:
                     pts = 0
                 results[team] = {
@@ -308,6 +324,69 @@ class GameHandler(SimpleHTTPRequestHandler):
             'scores': game_state['scores'],
             'finished': game_state['current_round_index'] >= len(seq) if seq else False,
         })
+
+    def _handle_override_word(self, body: dict):
+        team = body.get('team')
+        if not team:
+            self._json_response({'error': 'No team specified'}, 400)
+            return
+        history = game_state.get('round_history', [])
+        # Find the most recent letters round
+        rnd = None
+        for r in reversed(history):
+            if r.get('type') == 'letters':
+                rnd = r
+                break
+        if not rnd or 'results' not in rnd:
+            self._json_response({'error': 'No letters round to override'}, 400)
+            return
+        results = rnd['results']
+        if team not in results:
+            self._json_response({'error': f'Team {team} not found'}, 400)
+            return
+        entry = results[team]
+        if entry.get('valid'):
+            self._json_response({'error': 'Word already valid'}, 400)
+            return
+        # Override: award base score for word length
+        old_total = entry['total']
+        entry['valid'] = True
+        entry['base_score'] = len(entry['word'])
+        entry.pop('error', None)
+        # Recalculate bonuses for all teams in this round
+        all_bases = {t: r['base_score'] for t, r in results.items()}
+        top = max(all_bases.values()) if all_bases else 0
+        runner_up = 0
+        for s in sorted(all_bases.values(), reverse=True):
+            if s < top:
+                runner_up = s
+                break
+        bonus = max(3, 3 * (top - runner_up)) if top > 0 else 0
+        for t, r in results.items():
+            r['bonus'] = bonus if r['base_score'] == top and top > 0 else 0
+            r['total'] = r['base_score'] + r['bonus']
+        # Update cumulative scores
+        diff = entry['total'] - old_total
+        game_state['scores'][team] = game_state['scores'].get(team, 0) + diff
+        # Recalc other teams whose bonus may have changed
+        for t, r in results.items():
+            if t != team:
+                old_t = all_bases[t] + (bonus if all_bases[t] == top else 0)
+                # Just recompute from scratch for safety
+                pass
+        # Simpler: recompute all team scores from round history
+        scores = {t: 0 for t in game_state['teams']}
+        for past_rnd in history:
+            if 'results' in past_rnd:
+                for t, r in past_rnd['results'].items():
+                    if isinstance(r, dict) and 'total' in r:
+                        scores[t] = scores.get(t, 0) + r['total']
+                    elif isinstance(r, dict) and 'score' in r:
+                        scores[t] = scores.get(t, 0) + r['score']
+                    elif isinstance(r, int):
+                        scores[t] = scores.get(t, 0) + r
+        game_state['scores'] = scores
+        self._json_response({'results': results, 'scores': scores})
 
     # --- Helpers ---
 
