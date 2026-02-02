@@ -12,7 +12,8 @@
 - Exact match to target: **10 pts**
 - Within 5: **7 pts**
 - Within 10: **5 pts**
-- Further than 10: **0 pts**
+- Within 20: **3 pts**
+- Further than 20: **0 pts**
 
 ### Conundrum
 - First team to solve: **10 pts**
@@ -59,9 +60,13 @@ Standard Countdown frequencies. Vowels: A(15), E(21), I(13), O(13), U(5). Conson
 
 A random 9-letter word scrambled into an anagram. Default length 9; adjustable in custom settings.
 
+On **Easy** mode, conundrum words are filtered to common, recognisable words (no rare letters) and the scramble keeps a few letters in place. On **Hard**, any word and a fully random scramble.
+
 ## Tips for hosting
 
 - Go fullscreen (F11) on the `/host` page for projector display
 - The rules sidebar is always available — click "Rules" on the right edge
 - For expression entry, the host can type `*` for multiply and `/` for divide
-- If a word isn't in the dictionary but the group agrees it's valid, toggle auto-check off in setup (or just award points manually)
+- If a word isn't in the dictionary but the group agrees it's valid, click the **Override** button next to it in the results. Or toggle auto-check off in setup.
+- Sound effects (tick + buzzer) are off by default. Click the music note icon in the bottom-left to toggle.
+- During numbers expression entry, a live distance readout shows how close each expression is to the target as you type.
