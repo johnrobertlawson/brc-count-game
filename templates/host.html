@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Countdown Party</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="host-page">
+
+<!-- SCOREBOARD HEADER -->
+<header id="scoreboard">
+  <div class="score-title">COUNTDOWN</div>
+  <div id="score-chips"></div>
+  <div id="round-indicator"></div>
+</header>
+
+<!-- MAIN GAME AREA -->
+<main id="game-area">
+  <!-- Lobby / between rounds -->
+  <div id="screen-lobby" class="screen active">
+    <h2 class="neon-text">Ready</h2>
+    <div id="lobby-controls"></div>
+  </div>
+
+  <!-- LETTERS ROUND -->
+  <div id="screen-letters" class="screen">
+    <div id="letter-tiles" class="tiles"></div>
+    <div id="letters-timer" class="timer-display"></div>
+    <div id="letters-pick" class="pick-controls">
+      <button class="btn-neon" onclick="drawLetter('vowel')">Vowel</button>
+      <button class="btn-neon" onclick="drawLetter('consonant')">Consonant</button>
+    </div>
+    <div id="letters-submit" class="submit-area hidden"></div>
+    <div id="letters-results" class="results-area hidden"></div>
+  </div>
+
+  <!-- NUMBERS ROUND -->
+  <div id="screen-numbers" class="screen">
+    <div id="number-tiles" class="tiles"></div>
+    <div id="numbers-target" class="target-display"></div>
+    <div id="numbers-timer" class="timer-display"></div>
+    <div id="numbers-pick" class="pick-controls">
+      <label>Large numbers (0-4):
+        <input type="number" id="large-count" min="0" max="4" value="1" class="num-input">
+      </label>
+      <button class="btn-neon" onclick="drawNumbers()">Draw Numbers</button>
+    </div>
+    <div id="numbers-submit" class="submit-area hidden"></div>
+    <div id="numbers-results" class="results-area hidden"></div>
+  </div>
+
+  <!-- CONUNDRUM ROUND -->
+  <div id="screen-conundrum" class="screen">
+    <div id="conundrum-tiles" class="tiles"></div>
+    <div id="conundrum-timer" class="timer-display"></div>
+    <div id="conundrum-buzz" class="buzz-area hidden"></div>
+    <div id="conundrum-results" class="results-area hidden"></div>
+  </div>
+
+  <!-- END SCREEN -->
+  <div id="screen-end" class="screen">
+    <h2 class="neon-text">Game Over</h2>
+    <div id="final-scores"></div>
+    <button class="btn-neon btn-start" onclick="window.location='/'">New Game</button>
+  </div>
+</main>
+
+<!-- RULES SIDEBAR -->
+<aside id="rules-panel" class="collapsed">
+  <button id="rules-toggle" onclick="toggleRules()">Rules</button>
+  <div class="rules-content">
+    <h3>Letters</h3>
+    <p>Pick 9 letters. Make the longest word. Score = word length. Winner gets a bonus.</p>
+    <h3>Numbers</h3>
+    <p>Pick 6 numbers. Hit the target using +, -, *, /. Exact=10pts, within 5=7pts, within 10=5pts.</p>
+    <h3>Conundrum</h3>
+    <p>Unscramble the anagram. First to buzz in wins 10 points.</p>
+  </div>
+</aside>
+
+<script>
+// --- State ---
+let state = {};
+let timerInterval = null;
+let timerSeconds = 45;
+
+// --- Init ---
+async function init() {
+  const resp = await fetch('/api/state');
+  state = await resp.json();
+  if (!state.teams || state.teams.length === 0) {
+    window.location = '/';
+    return;
+  }
+  timerSeconds = state.settings?.timer_seconds || 45;
+  renderScoreboard();
+  showLobby();
+}
+
+// --- Scoreboard ---
+function renderScoreboard() {
+  const chips = document.getElementById('score-chips');
+  chips.innerHTML = state.teams.map(t =>
+    `<div class="score-chip"><span class="team-name">${esc(t)}</span><span class="team-score" id="score-${esc(t)}">${state.scores[t] || 0}</span></div>`
+  ).join('');
+  updateRoundIndicator();
+}
+
+function updateScores() {
+  state.teams.forEach(t => {
+    const el = document.getElementById(`score-${esc(t)}`);
+    if (el) el.textContent = state.scores[t] || 0;
+  });
+}
+
+function updateRoundIndicator() {
+  const el = document.getElementById('round-indicator');
+  const seq = state.round_sequence || [];
+  if (seq.length === 0) {
+    el.textContent = 'Freestyle';
+  } else {
+    el.textContent = `Round ${Math.min(state.current_round_index + 1, seq.length)} / ${seq.length}`;
+  }
+}
+
+// --- Screen management ---
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// --- Lobby ---
+function showLobby() {
+  const ctrl = document.getElementById('lobby-controls');
+  const seq = state.round_sequence || [];
+  const idx = state.current_round_index || 0;
+
+  if (seq.length > 0 && idx >= seq.length) {
+    showEndScreen();
+    return;
+  }
+
+  let html = '';
+  if (state.settings?.round_mode === 'freestyle' || seq.length === 0) {
+    html = `
+      <p class="lobby-hint">Choose round type:</p>
+      <button class="btn-neon" onclick="startRound('letters')">Letters</button>
+      <button class="btn-neon" onclick="startRound('numbers')">Numbers</button>
+      <button class="btn-neon btn-conundrum" onclick="startRound('conundrum')">Conundrum</button>
+      <button class="btn-neon btn-end" onclick="showEndScreen()">End Game</button>
+    `;
+  } else {
+    const next = seq[idx];
+    const label = next.charAt(0).toUpperCase() + next.slice(1);
+    html = `
+      <p class="lobby-hint">Next: <strong>${label}</strong> round</p>
+      <button class="btn-neon btn-start" onclick="startRound('${next}')">Start Round</button>
+    `;
+  }
+  ctrl.innerHTML = html;
+  showScreen('screen-lobby');
+}
+
+// --- Start round ---
+async function startRound(type) {
+  const resp = await fetch('/api/start_round', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({type})
+  });
+  const data = await resp.json();
+  state.current_round = data.round;
+
+  if (type === 'letters') initLettersRound();
+  else if (type === 'numbers') initNumbersRound();
+  else if (type === 'conundrum') initConundrumRound();
+}
+
+// ========== LETTERS ROUND ==========
+function initLettersRound() {
+  document.getElementById('letter-tiles').innerHTML = '';
+  document.getElementById('letters-timer').textContent = '';
+  document.getElementById('letters-pick').classList.remove('hidden');
+  document.getElementById('letters-submit').classList.add('hidden');
+  document.getElementById('letters-results').classList.add('hidden');
+  showScreen('screen-letters');
+}
+
+async function drawLetter(kind) {
+  const resp = await fetch('/api/draw_letter', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({kind})
+  });
+  const data = await resp.json();
+  renderLetterTiles(data.letters);
+  if (data.phase === 'playing') {
+    document.getElementById('letters-pick').classList.add('hidden');
+    startTimer('letters-timer', () => showLettersSubmit());
+  }
+}
+
+function renderLetterTiles(letters) {
+  const container = document.getElementById('letter-tiles');
+  container.innerHTML = letters.map(l =>
+    `<div class="tile tile-letter">${l.toUpperCase()}</div>`
+  ).join('');
+}
+
+function showLettersSubmit() {
+  const area = document.getElementById('letters-submit');
+  area.classList.remove('hidden');
+  area.innerHTML = `<h3>Enter words</h3>` +
+    state.teams.map(t =>
+      `<div class="submit-row"><label>${esc(t)}:</label><input type="text" id="word-${esc(t)}" class="word-input" maxlength="9" autocomplete="off"></div>`
+    ).join('') +
+    `<button class="btn-neon" onclick="submitLetters()">Score</button>`;
+  // Focus first input
+  const firstInput = area.querySelector('.word-input');
+  if (firstInput) firstInput.focus();
+}
+
+async function submitLetters() {
+  const submissions = {};
+  state.teams.forEach(t => {
+    const inp = document.getElementById(`word-${esc(t)}`);
+    submissions[t] = inp ? inp.value : '';
+  });
+  const resp = await fetch('/api/submit_letters', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({submissions})
+  });
+  const data = await resp.json();
+  state.scores = data.scores;
+  updateScores();
+  showLettersResults(data.results);
+}
+
+function showLettersResults(results) {
+  document.getElementById('letters-submit').classList.add('hidden');
+  const area = document.getElementById('letters-results');
+  area.classList.remove('hidden');
+  let html = '<h3>Results</h3><div class="results-grid">';
+  for (const [team, r] of Object.entries(results)) {
+    const cls = r.valid ? 'valid' : 'invalid';
+    const err = r.error ? ` <span class="err">(${r.error})</span>` : '';
+    const bonus = r.bonus > 0 ? ` <span class="bonus">+${r.bonus} bonus</span>` : '';
+    html += `<div class="result-row ${cls}">
+      <span class="team-name">${esc(team)}</span>
+      <span class="result-word">${esc(r.word || '-')}${err}</span>
+      <span class="result-score">${r.total}${bonus}</span>
+    </div>`;
+  }
+  html += '</div><button class="btn-neon" onclick="nextRound()">Continue</button>';
+  area.innerHTML = html;
+}
+
+// ========== NUMBERS ROUND ==========
+function initNumbersRound() {
+  document.getElementById('number-tiles').innerHTML = '';
+  document.getElementById('numbers-target').textContent = '';
+  document.getElementById('numbers-timer').textContent = '';
+  document.getElementById('numbers-pick').classList.remove('hidden');
+  document.getElementById('numbers-submit').classList.add('hidden');
+  document.getElementById('numbers-results').classList.add('hidden');
+  showScreen('screen-numbers');
+}
+
+async function drawNumbers() {
+  const lc = parseInt(document.getElementById('large-count').value) || 1;
+  const resp = await fetch('/api/draw_numbers', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({large_count: lc})
+  });
+  const data = await resp.json();
+  renderNumberTiles(data.numbers);
+  // Show target with dramatic reveal
+  document.getElementById('numbers-target').innerHTML = `<span class="target-label">TARGET</span><span class="target-number">${data.target}</span>`;
+  document.getElementById('numbers-pick').classList.add('hidden');
+  startTimer('numbers-timer', () => showNumbersSubmit());
+}
+
+function renderNumberTiles(numbers) {
+  const container = document.getElementById('number-tiles');
+  container.innerHTML = numbers.map(n =>
+    `<div class="tile tile-number">${n}</div>`
+  ).join('');
+}
+
+function showNumbersSubmit() {
+  const area = document.getElementById('numbers-submit');
+  area.classList.remove('hidden');
+  area.innerHTML = `<h3>Enter expressions</h3>
+    <p class="hint">Use +, -, *, / and parentheses. E.g. (75+50)*8+2</p>` +
+    state.teams.map(t =>
+      `<div class="submit-row"><label>${esc(t)}:</label><input type="text" id="expr-${esc(t)}" class="expr-input" autocomplete="off" placeholder="e.g. (100+25)*4"></div>`
+    ).join('') +
+    `<button class="btn-neon" onclick="submitNumbers()">Verify & Score</button>`;
+  const firstInput = area.querySelector('.expr-input');
+  if (firstInput) firstInput.focus();
+}
+
+async function submitNumbers() {
+  const submissions = {};
+  state.teams.forEach(t => {
+    const inp = document.getElementById(`expr-${esc(t)}`);
+    submissions[t] = inp ? inp.value : '';
+  });
+  const resp = await fetch('/api/submit_numbers', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({submissions})
+  });
+  const data = await resp.json();
+  state.scores = data.scores;
+  updateScores();
+  showNumbersResults(data.results);
+}
+
+function showNumbersResults(results) {
+  document.getElementById('numbers-submit').classList.add('hidden');
+  const area = document.getElementById('numbers-results');
+  area.classList.remove('hidden');
+  let html = '<h3>Results</h3><div class="results-grid">';
+  for (const [team, r] of Object.entries(results)) {
+    const cls = r.error ? 'invalid' : (r.diff === 0 ? 'exact' : 'valid');
+    const err = r.error ? ` <span class="err">(${r.error})</span>` : '';
+    const val = r.result !== null ? `= ${r.result} (off by ${r.diff})` : 'invalid';
+    html += `<div class="result-row ${cls}">
+      <span class="team-name">${esc(team)}</span>
+      <span class="result-word">${esc(r.expression || '-')} ${val}${err}</span>
+      <span class="result-score">${r.score} pts</span>
+    </div>`;
+  }
+  html += '</div><button class="btn-neon" onclick="nextRound()">Continue</button>';
+  area.innerHTML = html;
+}
+
+// ========== CONUNDRUM ROUND ==========
+function initConundrumRound() {
+  const rnd = state.current_round;
+  const container = document.getElementById('conundrum-tiles');
+  container.innerHTML = rnd.anagram.split('').map(l =>
+    `<div class="tile tile-conundrum">${l.toUpperCase()}</div>`
+  ).join('');
+  document.getElementById('conundrum-timer').textContent = '';
+  document.getElementById('conundrum-buzz').classList.remove('hidden');
+  document.getElementById('conundrum-results').classList.add('hidden');
+
+  // Buzz-in buttons
+  const buzz = document.getElementById('conundrum-buzz');
+  buzz.innerHTML = `<h3>First to solve — click their button!</h3>` +
+    state.teams.map(t =>
+      `<button class="btn-neon btn-buzz" onclick="buzzConundrum('${esc(t)}')">${esc(t)}</button>`
+    ).join('') +
+    `<button class="btn-neon btn-nobuzz" onclick="buzzConundrum(null)">No one solved it</button>`;
+
+  showScreen('screen-conundrum');
+  startTimer('conundrum-timer', () => {
+    // Time's up — no one buzzed
+    buzzConundrum(null);
+  });
+}
+
+async function buzzConundrum(team) {
+  clearTimer();
+  const resp = await fetch('/api/submit_conundrum', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({team})
+  });
+  const data = await resp.json();
+  state.scores = data.scores;
+  updateScores();
+  showConundrumResults(data);
+}
+
+function showConundrumResults(data) {
+  document.getElementById('conundrum-buzz').classList.add('hidden');
+  const area = document.getElementById('conundrum-results');
+  area.classList.remove('hidden');
+  const winner = Object.entries(data.results).find(([_, pts]) => pts > 0);
+  let html = `<h3>Answer: <span class="neon-text">${data.answer.toUpperCase()}</span></h3>`;
+  if (winner) {
+    html += `<p class="winner">${esc(winner[0])} wins 10 points!</p>`;
+  } else {
+    html += `<p>No one solved it.</p>`;
+  }
+  html += `<button class="btn-neon" onclick="nextRound()">Continue</button>`;
+  area.innerHTML = html;
+}
+
+// ========== TIMER ==========
+function startTimer(elementId, onFinish) {
+  clearTimer();
+  let remaining = timerSeconds;
+  const el = document.getElementById(elementId);
+  el.textContent = remaining;
+  el.className = 'timer-display timer-running';
+
+  timerInterval = setInterval(() => {
+    remaining--;
+    el.textContent = remaining;
+    if (remaining <= 10) el.classList.add('timer-warning');
+    if (remaining <= 5) el.classList.add('timer-critical');
+    if (remaining <= 0) {
+      clearTimer();
+      el.textContent = "TIME";
+      el.classList.add('timer-done');
+      onFinish();
+    }
+  }, 1000);
+}
+
+function clearTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+// ========== GAME FLOW ==========
+async function nextRound() {
+  clearTimer();
+  const resp = await fetch('/api/next_round', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({})
+  });
+  const data = await resp.json();
+  state.current_round_index = data.round_index;
+  state.scores = data.scores;
+  updateScores();
+  updateRoundIndicator();
+
+  if (data.finished) {
+    showEndScreen();
+  } else {
+    showLobby();
+  }
+}
+
+function showEndScreen() {
+  showScreen('screen-end');
+  const el = document.getElementById('final-scores');
+  const sorted = Object.entries(state.scores).sort((a, b) => b[1] - a[1]);
+  let html = '<div class="final-scores-list">';
+  sorted.forEach(([team, score], i) => {
+    const cls = i === 0 ? 'winner' : '';
+    const crown = i === 0 ? ' ★' : '';
+    html += `<div class="final-score-row ${cls}"><span class="team-name">${esc(team)}${crown}</span><span class="team-score">${score}</span></div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ========== RULES ==========
+function toggleRules() {
+  document.getElementById('rules-panel').classList.toggle('collapsed');
+}
+
+// ========== UTIL ==========
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// --- Boot ---
+init();
+</script>
+</body>
+</html>

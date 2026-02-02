@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Countdown Party — Setup</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="setup-page">
+<div class="setup-container">
+  <h1 class="neon-title">COUNTDOWN<span class="subtitle">PARTY</span></h1>
+
+  <section class="setup-section">
+    <h2>Teams</h2>
+    <div id="team-list">
+      <div class="team-row">
+        <input type="text" class="team-input" placeholder="Team 1 name" value="">
+        <button class="btn-remove" onclick="removeTeam(this)" title="Remove">✕</button>
+      </div>
+      <div class="team-row">
+        <input type="text" class="team-input" placeholder="Team 2 name" value="">
+        <button class="btn-remove" onclick="removeTeam(this)" title="Remove">✕</button>
+      </div>
+    </div>
+    <button class="btn-neon btn-small" onclick="addTeam()">+ Add Team</button>
+  </section>
+
+  <section class="setup-section">
+    <h2>Difficulty</h2>
+    <div class="macro-buttons">
+      <button class="btn-neon macro-btn" data-macro="easy" onclick="applyMacro('easy')">Easy</button>
+      <button class="btn-neon macro-btn active" data-macro="medium" onclick="applyMacro('medium')">Medium</button>
+      <button class="btn-neon macro-btn" data-macro="hard" onclick="applyMacro('hard')">Hard</button>
+      <button class="btn-neon macro-btn" data-macro="custom" onclick="applyMacro('custom')">Custom</button>
+    </div>
+
+    <div id="custom-settings" class="custom-settings hidden">
+      <label>Timer (seconds): <input type="number" id="timer" min="10" max="120" value="45"></label>
+      <label>Letters rounds: <input type="number" id="letters-count" min="0" max="10" value="5"></label>
+      <label>Numbers rounds: <input type="number" id="numbers-count" min="0" max="5" value="2"></label>
+      <label>Conundrum rounds: <input type="number" id="conundrum-count" min="0" max="3" value="1"></label>
+      <label>Conundrum word length: <input type="number" id="conundrum-length" min="5" max="15" value="9"></label>
+    </div>
+  </section>
+
+  <section class="setup-section">
+    <h2>Round Mode</h2>
+    <div class="macro-buttons">
+      <button class="btn-neon macro-btn active" data-mode="preset" onclick="setMode('preset')">Preset Sequence</button>
+      <button class="btn-neon macro-btn" data-mode="freestyle" onclick="setMode('freestyle')">Freestyle</button>
+    </div>
+  </section>
+
+  <section class="setup-section">
+    <h2>Options</h2>
+    <label class="toggle-label">
+      <input type="checkbox" id="auto-dict" checked>
+      Auto dictionary check
+    </label>
+  </section>
+
+  <button class="btn-neon btn-start" onclick="startGame()">START GAME</button>
+</div>
+
+<script>
+const MACROS = {
+  easy:   { timer: 60, letters: 4, numbers: 1, conundrum: 1, conundrum_length: 9 },
+  medium: { timer: 45, letters: 5, numbers: 2, conundrum: 1, conundrum_length: 9 },
+  hard:   { timer: 30, letters: 6, numbers: 2, conundrum: 1, conundrum_length: 9 },
+};
+
+let currentMacro = 'medium';
+let roundMode = 'preset';
+
+function addTeam() {
+  const list = document.getElementById('team-list');
+  const n = list.children.length + 1;
+  const row = document.createElement('div');
+  row.className = 'team-row';
+  row.innerHTML = `<input type="text" class="team-input" placeholder="Team ${n} name"><button class="btn-remove" onclick="removeTeam(this)" title="Remove">✕</button>`;
+  list.appendChild(row);
+}
+
+function removeTeam(btn) {
+  const list = document.getElementById('team-list');
+  if (list.children.length > 2) btn.parentElement.remove();
+}
+
+function applyMacro(macro) {
+  currentMacro = macro;
+  document.querySelectorAll('.macro-btn[data-macro]').forEach(b => b.classList.toggle('active', b.dataset.macro === macro));
+  const custom = document.getElementById('custom-settings');
+  if (macro === 'custom') {
+    custom.classList.remove('hidden');
+  } else {
+    custom.classList.add('hidden');
+    const m = MACROS[macro];
+    document.getElementById('timer').value = m.timer;
+    document.getElementById('letters-count').value = m.letters;
+    document.getElementById('numbers-count').value = m.numbers;
+    document.getElementById('conundrum-count').value = m.conundrum;
+    document.getElementById('conundrum-length').value = m.conundrum_length;
+  }
+}
+
+function setMode(mode) {
+  roundMode = mode;
+  document.querySelectorAll('.macro-btn[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+function buildSequence(letters, numbers, conundrums) {
+  // Interleave: LLNLLNLLC pattern
+  const seq = [];
+  let li = 0, ni = 0;
+  const total = letters + numbers;
+  const ratio = letters > 0 ? Math.ceil(letters / Math.max(1, numbers)) : 1;
+  let lDone = 0, nDone = 0;
+  while (lDone < letters || nDone < numbers) {
+    for (let i = 0; i < ratio && lDone < letters; i++) { seq.push('letters'); lDone++; }
+    if (nDone < numbers) { seq.push('numbers'); nDone++; }
+  }
+  for (let i = 0; i < conundrums; i++) seq.push('conundrum');
+  return seq;
+}
+
+async function startGame() {
+  const inputs = document.querySelectorAll('.team-input');
+  const teams = [];
+  inputs.forEach((inp, i) => {
+    const name = inp.value.trim() || `Team ${i + 1}`;
+    teams.push(name);
+  });
+
+  const timer = parseInt(document.getElementById('timer').value) || 45;
+  const letters = parseInt(document.getElementById('letters-count').value) || 5;
+  const numbers = parseInt(document.getElementById('numbers-count').value) || 2;
+  const conundrums = parseInt(document.getElementById('conundrum-count').value) || 1;
+  const conundrumLength = parseInt(document.getElementById('conundrum-length').value) || 9;
+  const autoDict = document.getElementById('auto-dict').checked;
+
+  const sequence = roundMode === 'preset' ? buildSequence(letters, numbers, conundrums) : [];
+
+  const resp = await fetch('/api/setup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      teams,
+      settings: {
+        timer_seconds: timer,
+        auto_dictionary: autoDict,
+        conundrum_length: conundrumLength,
+        round_mode: roundMode,
+        round_sequence: sequence,
+        macro: currentMacro,
+      }
+    })
+  });
+  if (resp.ok) window.location.href = '/host';
+}
+
+// Init
+applyMacro('medium');
+</script>
+</body>
+</html>
