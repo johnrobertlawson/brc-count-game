@@ -20,7 +20,9 @@ On Ubuntu, `jinja2` may already be installed as a system package (`python3-jinja
 python3 server.py
 ```
 
-Open `http://localhost:5000` in a browser. Set up teams, pick a difficulty, and start playing.
+Open `http://localhost:8000` in a browser. Set up teams, pick a difficulty, and start playing.
+
+Use `--port` to pick a different port if needed: `python3 server.py --port 9000`
 
 For projector use: go fullscreen (F11) on the `/host` page.
 

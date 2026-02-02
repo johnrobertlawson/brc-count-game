@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Countdown party game server using stdlib http.server + jinja2."""
 
+import argparse
 import json
 import os
 import random
@@ -365,9 +366,14 @@ class GameHandler(SimpleHTTPRequestHandler):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Countdown Party Game')
+    parser.add_argument('-p', '--port', type=int, default=8000,
+                        help='Port to run on (default: 8000)')
+    args = parser.parse_args()
+
     os.chdir(BASE)
     init_dictionary()
-    port = 5000
+    port = args.port
     server = HTTPServer(('0.0.0.0', port), GameHandler)
     print(f"Countdown Party running at http://localhost:{port}")
     print(f"  Setup: http://localhost:{port}/")
