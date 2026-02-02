@@ -26,7 +26,7 @@ Host enters each team's arithmetic expression exactly as written on paper.
 - Operators: `+`, `-`, `*`, `/`
 - Parentheses: `(` and `)`
 - Division must be exact (no remainders)
-- Each drawn number used at most once
+- Each drawn number used at most once (you don't have to use every number)
 - Example: `(75 + 50) * 8 + 2`
 
 The server verifies the expression is valid and computes the result.
@@ -36,6 +36,7 @@ The server verifies the expression is valid and computes the result.
 | Setting | Easy | Medium | Hard |
 |---------|------|--------|------|
 | Timer | 60s | 45s | 30s |
+| Conundrum length | 8 | 9 | 9 |
 | Conundrum lives | Yes | No | No |
 
 Difficulty controls the rules, not the number of rounds.
