@@ -182,6 +182,8 @@ def score_numbers_round(submissions: dict[str, int], target: int) -> dict:
             pts = 7
         elif diff <= 10:
             pts = 5
+        elif diff <= 20:
+            pts = 3
         else:
             pts = 0
         results[team] = {'result': result, 'diff': diff, 'score': pts}
@@ -192,7 +194,7 @@ def score_conundrum(winning_team: str | None, teams: list[str]) -> dict:
     return {t: (10 if t == winning_team else 0) for t in teams}
 
 
-# --- Conundrum helper ---
+# --- Conundrum helpers ---
 
 def generate_anagram(word: str) -> str:
     letters = list(word)
@@ -202,3 +204,21 @@ def generate_anagram(word: str) -> str:
         if anagram != word:
             return anagram
     return ''.join(reversed(letters))
+
+
+def generate_easy_anagram(word: str) -> str:
+    """Kinder scramble: keeps 2-3 letters in their original position."""
+    letters = list(word)
+    n = len(letters)
+    keep = random.sample(range(n), min(3, n))
+    movable = [i for i in range(n) if i not in keep]
+    movable_chars = [letters[i] for i in movable]
+    for _ in range(100):
+        random.shuffle(movable_chars)
+        candidate = list(letters)
+        for idx, ch in zip(movable, movable_chars):
+            candidate[idx] = ch
+        result = ''.join(candidate)
+        if result != word:
+            return result
+    return generate_anagram(word)

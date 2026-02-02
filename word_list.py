@@ -30,3 +30,13 @@ def can_make_word(word: str, available_letters: list[str]) -> bool:
 
 def get_conundrum_words(dictionary: set[str], length: int = 9) -> list[str]:
     return [w for w in dictionary if len(w) == length]
+
+
+# Letters that appear frequently in common English words
+_COMMON_LETTERS = set('abcdefghilmnoprstuw')
+
+
+def get_easy_conundrum_words(dictionary: set[str], length: int = 9) -> list[str]:
+    """Filter for common, recognisable words: only common letters, no rare chars."""
+    return [w for w in dictionary
+            if len(w) == length and set(w) <= _COMMON_LETTERS]
