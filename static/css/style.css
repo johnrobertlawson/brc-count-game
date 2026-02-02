@@ -2,7 +2,7 @@
    COUNTDOWN PARTY — Vaporwave / Neon Theme
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
 :root {
   --bg-dark: #0d0221;
@@ -18,6 +18,7 @@
   --gray: #6a6a8a;
   --font-mono: 'Share Tech Mono', 'Courier New', monospace;
   --font-display: 'Orbitron', 'Share Tech Mono', monospace;
+  --font-tile: 'Audiowide', 'Share Tech Mono', monospace;
   --glow-cyan: 0 0 10px #00fff5, 0 0 30px #00fff580, 0 0 60px #00fff530;
   --glow-pink: 0 0 10px #ff2079, 0 0 30px #ff207980, 0 0 60px #ff207930;
   --glow-purple: 0 0 10px #7b2ff7, 0 0 30px #7b2ff780;
@@ -354,9 +355,9 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
+  font-family: var(--font-tile);
   font-size: 2.2rem;
-  font-weight: 700;
+  font-weight: 400;
   border-radius: 4px;
   animation: tileIn 0.3s ease-out;
 }
@@ -675,20 +676,149 @@ body::before {
 
 .rules-content h3 {
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-size: 1rem;
   color: var(--pink);
   text-transform: uppercase;
   letter-spacing: 0.15em;
-  margin: 1rem 0 0.3rem;
+  margin: 1.2rem 0 0.4rem;
 }
 
 .rules-content h3:first-child { margin-top: 0; }
 
 .rules-content p {
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   color: var(--gray);
-  line-height: 1.5;
+  line-height: 1.6;
 }
+
+.rules-content .rules-icon {
+  margin-right: 0.4rem;
+}
+
+.difficulty-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--cyan);
+  border-radius: 2px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.8rem;
+}
+
+/* ============ ROUND SPLASH OVERLAY ============ */
+
+#round-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 2, 33, 0.95);
+  cursor: pointer;
+  animation: splashIn 0.3s ease-out;
+}
+
+@keyframes splashIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#round-splash .splash-type {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--cyan);
+  text-shadow: var(--glow-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.5rem;
+}
+
+#round-splash .splash-difficulty {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--pink);
+  text-shadow: var(--glow-pink);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: 1.5rem;
+}
+
+#round-splash .splash-scoring {
+  font-size: 1.3rem;
+  color: var(--white);
+  line-height: 2;
+  text-align: center;
+  max-width: 600px;
+}
+
+#round-splash .splash-scoring strong {
+  color: var(--yellow);
+}
+
+#round-splash .splash-hint {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: var(--gray);
+}
+
+/* ============ LIVE DISTANCE DISPLAY ============ */
+
+.live-distance {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  margin-top: 0.3rem;
+  min-height: 1.5rem;
+  transition: color 0.2s;
+}
+
+.live-distance.dist-exact { color: var(--green); text-shadow: 0 0 8px var(--green); }
+.live-distance.dist-close { color: var(--yellow); }
+.live-distance.dist-mid { color: #ff8c00; }
+.live-distance.dist-far { color: var(--red); }
+.live-distance.dist-error { color: var(--gray); font-size: 0.9rem; }
+
+/* ============ OVERRIDE BUTTON ============ */
+
+.btn-override {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-color: var(--yellow);
+  color: var(--yellow);
+  margin-left: 0.5rem;
+}
+
+.btn-override:hover {
+  background: rgba(255, 215, 0, 0.15);
+}
+
+/* ============ SOUND TOGGLE ============ */
+
+#sound-toggle {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 15;
+  font-size: 1.5rem;
+  background: var(--bg-mid);
+  border: 1px solid var(--purple-dim);
+  color: var(--gray);
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+#sound-toggle:hover { color: var(--cyan); border-color: var(--cyan); }
+#sound-toggle.active { color: var(--cyan); }
 
 /* ============ RESPONSIVE ============ */
 
