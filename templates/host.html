@@ -324,10 +324,10 @@ async function submitLetters() {
   const data = await resp.json();
   state.scores = data.scores;
   updateScores();
-  showLettersResults(data.results);
+  showLettersResults(data.results, data.reveal);
 }
 
-function showLettersResults(results) {
+function showLettersResults(results, reveal) {
   document.getElementById('letters-submit').classList.add('hidden');
   const area = document.getElementById('letters-results');
   area.classList.remove('hidden');
@@ -345,7 +345,42 @@ function showLettersResults(results) {
       <span class="result-score">${r.total}${bonus}</span>
     </div>`;
   }
-  html += '</div><button class="btn-neon" onclick="nextRound()">Continue</button>';
+  html += '</div>';
+
+  // Dictionary Geeks Club reveal
+  if (reveal) {
+    html += '<div class="reveal-section reveal-letters">';
+    html += '<div class="reveal-header reveal-geeks-header">THE DICTIONARY GEEKS CLUB</div>';
+    const avail = reveal.available_letters || [];
+
+    if (reveal.best_word && reveal.best_word.word) {
+      const bw = reveal.best_word;
+      const usage = buildLetterUsageMap(bw.letters_used, avail);
+      const altText = bw.alternatives_count > 1
+        ? ` <span class="reveal-alt">(${bw.alternatives_count} words of this length)</span>` : '';
+      html += `<div class="reveal-word-section">
+        <div class="reveal-sub-header">Best Word</div>
+        <div class="reveal-word">${bw.word.toUpperCase()}</div>
+        <div class="reveal-word-meta">${bw.length} letters${altText}</div>
+        <div class="reveal-tiles">${renderRevealLetterTiles(usage)}</div>
+      </div>`;
+    }
+
+    if (reveal.rarest_word && reveal.rarest_word.word) {
+      const rw = reveal.rarest_word;
+      const usage = buildLetterUsageMap(rw.letters_used, avail);
+      html += `<div class="reveal-word-section">
+        <div class="reveal-sub-header">Rare Find</div>
+        <div class="reveal-word">${rw.word.toUpperCase()}</div>
+        <div class="reveal-word-meta">Scrabble value: ${rw.scrabble_score}</div>
+        <div class="reveal-tiles">${renderRevealLetterTiles(usage)}</div>
+      </div>`;
+    }
+
+    html += '</div>';
+  }
+
+  html += '<button class="btn-neon" onclick="nextRound()">Continue</button>';
   area.innerHTML = html;
 }
 
@@ -391,9 +426,30 @@ async function drawNumbers() {
 
 function renderNumberTiles(numbers) {
   const container = document.getElementById('number-tiles');
-  container.innerHTML = numbers.map(n =>
-    `<div class="tile tile-number">${n}</div>`
+  container.innerHTML = numbers.map((n, i) =>
+    `<div class="tile tile-number" data-idx="${i}" data-val="${n}">${n}</div>`
   ).join('');
+}
+
+function dimUsedTiles(exprStr) {
+  const tiles = document.querySelectorAll('#number-tiles .tile-number');
+  tiles.forEach(t => t.classList.remove('tile-used'));
+  if (!exprStr || !exprStr.trim()) return;
+  // Extract all number literals from expression
+  const nums = exprStr.match(/\d+/g);
+  if (!nums) return;
+  // Build a pool of available tile indices (track which are consumed)
+  const available = [];
+  tiles.forEach((t, i) => available.push({ idx: i, val: parseInt(t.dataset.val), used: false }));
+  // For each number in expression, consume one matching tile
+  for (const n of nums) {
+    const val = parseInt(n);
+    const match = available.find(a => !a.used && a.val === val);
+    if (match) {
+      match.used = true;
+      tiles[match.idx].classList.add('tile-used');
+    }
+  }
 }
 
 function showNumbersSubmit() {
@@ -432,20 +488,24 @@ function updateLiveDistance(team) {
   const el = document.getElementById(`dist-${esc(team)}`);
   if (!inp || !el || currentTarget === null) return;
   const val = inp.value.trim();
-  if (!val) { el.textContent = ''; el.className = 'live-distance'; return; }
-  const result = safeEvalExpr(val);
-  if (result === null) {
-    el.textContent = '...';
-    el.className = 'live-distance dist-error';
-    return;
+  if (!val) { el.textContent = ''; el.className = 'live-distance'; }
+  else {
+    const result = safeEvalExpr(val);
+    if (result === null) {
+      el.textContent = '...';
+      el.className = 'live-distance dist-error';
+    } else {
+      const diff = Math.abs(result - currentTarget);
+      let cls = 'dist-far';
+      if (diff === 0) cls = 'dist-exact';
+      else if (diff <= 10) cls = 'dist-close';
+      else if (diff <= 20) cls = 'dist-mid';
+      el.textContent = `= ${result} (${diff === 0 ? 'EXACT!' : diff + ' away'})`;
+      el.className = 'live-distance ' + cls;
+    }
   }
-  const diff = Math.abs(result - currentTarget);
-  let cls = 'dist-far';
-  if (diff === 0) cls = 'dist-exact';
-  else if (diff <= 10) cls = 'dist-close';
-  else if (diff <= 20) cls = 'dist-mid';
-  el.textContent = `= ${result} (${diff === 0 ? 'EXACT!' : diff + ' away'})`;
-  el.className = 'live-distance ' + cls;
+  // Dim tiles based on the currently focused team's expression
+  dimUsedTiles(inp.value);
 }
 
 async function submitNumbers() {
@@ -462,10 +522,10 @@ async function submitNumbers() {
   const data = await resp.json();
   state.scores = data.scores;
   updateScores();
-  showNumbersResults(data.results);
+  showNumbersResults(data.results, data.best_solution);
 }
 
-function showNumbersResults(results) {
+function showNumbersResults(results, bestSolution) {
   document.getElementById('numbers-submit').classList.add('hidden');
   const area = document.getElementById('numbers-results');
   area.classList.remove('hidden');
@@ -480,11 +540,46 @@ function showNumbersResults(results) {
       <span class="result-score">${r.score} pts</span>
     </div>`;
   }
-  html += '</div><button class="btn-neon" onclick="nextRound()">Continue</button>';
+  html += '</div>';
+
+  // Best Possible reveal
+  if (bestSolution && bestSolution.expression) {
+    const distLabel = bestSolution.exact
+      ? '<span class="reveal-exact">EXACT!</span>'
+      : `<span class="reveal-off">${bestSolution.diff} away</span>`;
+
+    // Build mini-tiles showing which numbers were used
+    const usedNums = bestSolution.expression.match(/\d+/g) || [];
+    const allTiles = document.querySelectorAll('#number-tiles .tile-number');
+    const available = Array.from(allTiles).map(t => ({
+      val: parseInt(t.dataset.val), used: false
+    }));
+    for (const n of usedNums) {
+      const val = parseInt(n);
+      const match = available.find(a => !a.used && a.val === val);
+      if (match) match.used = true;
+    }
+    const tilesHtml = available.map(a =>
+      `<span class="mini-tile mini-tile-number ${a.used ? 'mini-tile-lit' : 'mini-tile-dim'}">${a.val}</span>`
+    ).join('');
+
+    html += `<div class="reveal-section reveal-numbers">
+      <div class="reveal-header">BEST POSSIBLE</div>
+      <div class="reveal-expression">${esc(bestSolution.expression)} = ${bestSolution.result}</div>
+      <div class="reveal-distance">${distLabel}</div>
+      <div class="reveal-tiles">${tilesHtml}</div>
+    </div>`;
+  }
+
+  html += '<button class="btn-neon" onclick="nextRound()">Continue</button>';
   area.innerHTML = html;
 }
 
 // ========== CONUNDRUM ROUND ==========
+let conundrumLives = {};  // { team: livesRemaining }
+let conundrumLivesMode = false;
+let conundrumBuzzingTeam = null;  // team currently guessing
+
 function initConundrumRound() {
   const rnd = state.current_round;
   const container = document.getElementById('conundrum-tiles');
@@ -495,18 +590,133 @@ function initConundrumRound() {
   document.getElementById('conundrum-buzz').classList.remove('hidden');
   document.getElementById('conundrum-results').classList.add('hidden');
 
-  const buzz = document.getElementById('conundrum-buzz');
-  buzz.innerHTML = `<h3>First to solve -- click their button!</h3>` +
-    state.teams.map(t =>
-      `<button class="btn-neon btn-buzz" onclick="buzzConundrum('${esc(t)}')">${esc(t)}</button>`
-    ).join('') +
-    `<button class="btn-neon btn-nobuzz" onclick="buzzConundrum(null)">No one solved it</button>`;
+  conundrumLivesMode = rnd.lives_mode || false;
+  conundrumLives = rnd.lives || {};
+  conundrumBuzzingTeam = null;
 
+  renderConundrumBuzz();
   showScreen('screen-conundrum');
-  startTimer('conundrum-timer', () => buzzConundrum(null));
+  startTimer('conundrum-timer', () => conundrumTimeUp());
 }
 
-async function buzzConundrum(team) {
+function renderConundrumBuzz() {
+  const buzz = document.getElementById('conundrum-buzz');
+  if (conundrumLivesMode) {
+    // Lives mode: show buzz buttons + lives display
+    let html = '<div class="lives-display">';
+    state.teams.forEach(t => {
+      const lives = conundrumLives[t] || 0;
+      const dots = Array(5).fill(0).map((_, i) =>
+        `<span class="life-dot ${i < lives ? 'life-full' : 'life-empty'}"></span>`
+      ).join('');
+      html += `<div class="lives-team"><span class="lives-name">${esc(t)}</span>${dots}</div>`;
+    });
+    html += '</div>';
+    if (conundrumBuzzingTeam) {
+      // Show guess input for the buzzing team
+      html += `<div class="buzz-guess-area">
+        <h3>${esc(conundrumBuzzingTeam)} is guessing...</h3>
+        <input type="text" id="conundrum-guess" class="word-input" maxlength="15" autocomplete="off" placeholder="Type the word"
+          onkeydown="if(event.key==='Enter')submitConundrumGuess()">
+        <button class="btn-neon" onclick="submitConundrumGuess()">Submit</button>
+      </div>`;
+    } else {
+      // Show buzz buttons for teams with lives remaining
+      html += `<h3>Buzz in to guess!</h3><div class="buzz-buttons">`;
+      state.teams.forEach(t => {
+        const lives = conundrumLives[t] || 0;
+        if (lives > 0) {
+          html += `<button class="btn-neon btn-buzz" onclick="conundrumBuzz('${esc(t)}')">${esc(t)}</button>`;
+        } else {
+          html += `<button class="btn-neon btn-buzz" disabled style="opacity:0.3">${esc(t)} (out)</button>`;
+        }
+      });
+      html += `</div>`;
+      // Check if all teams are out of lives
+      const anyAlive = state.teams.some(t => (conundrumLives[t] || 0) > 0);
+      if (!anyAlive) {
+        html += `<p style="color:var(--gray);margin-top:0.5rem">All teams out of lives!</p>`;
+      }
+      html += `<button class="btn-neon btn-nobuzz" onclick="conundrumGiveUp()">No one solved it</button>`;
+    }
+    buzz.innerHTML = html;
+    // Auto-focus guess input
+    const guessInput = document.getElementById('conundrum-guess');
+    if (guessInput) guessInput.focus();
+  } else {
+    // Classic mode: instant award on buzz
+    buzz.innerHTML = `<h3>First to solve -- click their button!</h3>` +
+      state.teams.map(t =>
+        `<button class="btn-neon btn-buzz" onclick="buzzConundrumClassic('${esc(t)}')">${esc(t)}</button>`
+      ).join('') +
+      `<button class="btn-neon btn-nobuzz" onclick="buzzConundrumClassic(null)">No one solved it</button>`;
+  }
+}
+
+function conundrumBuzz(team) {
+  // Team buzzed in — show guess input, do NOT stop timer
+  conundrumBuzzingTeam = team;
+  renderConundrumBuzz();
+}
+
+async function submitConundrumGuess() {
+  const inp = document.getElementById('conundrum-guess');
+  if (!inp) return;
+  const guess = inp.value.trim();
+  if (!guess) return;
+  const team = conundrumBuzzingTeam;
+  const resp = await fetch('/api/buzz_conundrum', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({team, guess})
+  });
+  const data = await resp.json();
+  if (data.correct) {
+    // Correct! Stop timer and show results
+    clearTimer();
+    state.scores = data.scores;
+    updateScores();
+    showConundrumResults(data);
+  } else {
+    // Wrong — update lives, flash feedback, return to buzz buttons
+    conundrumLives = data.lives || conundrumLives;
+    conundrumBuzzingTeam = null;
+    renderConundrumBuzz();
+    // Flash wrong indicator
+    const buzz = document.getElementById('conundrum-buzz');
+    const flash = document.createElement('div');
+    flash.className = 'buzz-wrong-flash';
+    flash.textContent = `Wrong! ${esc(team)} loses a life`;
+    buzz.prepend(flash);
+    setTimeout(() => flash.remove(), 2000);
+    // Check if all teams out
+    const anyAlive = state.teams.some(t => (conundrumLives[t] || 0) > 0);
+    if (!anyAlive) {
+      clearTimer();
+      conundrumGiveUp();
+    }
+  }
+}
+
+function conundrumTimeUp() {
+  // Timer expired — end round with no winner
+  conundrumGiveUp();
+}
+
+async function conundrumGiveUp() {
+  clearTimer();
+  const resp = await fetch('/api/submit_conundrum', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({team: null})
+  });
+  const data = await resp.json();
+  state.scores = data.scores;
+  updateScores();
+  showConundrumResults(data);
+}
+
+async function buzzConundrumClassic(team) {
   clearTimer();
   const resp = await fetch('/api/submit_conundrum', {
     method: 'POST',
@@ -600,6 +810,22 @@ function showEndScreen() {
 // ========== RULES ==========
 function toggleRules() {
   document.getElementById('rules-panel').classList.toggle('collapsed');
+}
+
+// ========== REVEAL HELPERS ==========
+function buildLetterUsageMap(usedLetters, availableLetters) {
+  const avail = availableLetters.map((l, i) => ({idx: i, letter: l.toLowerCase(), used: false}));
+  for (const ul of usedLetters) {
+    const match = avail.find(a => !a.used && a.letter === ul.toLowerCase());
+    if (match) match.used = true;
+  }
+  return avail;
+}
+
+function renderRevealLetterTiles(usageMap) {
+  return usageMap.map(a =>
+    `<span class="mini-tile mini-tile-letter ${a.used ? 'mini-tile-lit' : 'mini-tile-dim'}">${a.letter.toUpperCase()}</span>`
+  ).join('');
 }
 
 // ========== UTIL ==========
