@@ -1037,6 +1037,66 @@ body::before {
 .reveal-numbers { border-color: rgba(255, 32, 121, 0.3); }
 .reveal-letters { border-color: rgba(255, 32, 121, 0.3); }
 
+/* ============ SPLASH TIPS ============ */
+
+.splash-tips {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.splash-tip {
+  font-size: 1rem;
+  color: var(--gray);
+  line-height: 1.8;
+}
+
+/* ============ KEY HINT BADGES ============ */
+
+.key-hint {
+  display: inline-block;
+  font-size: 0.75rem;
+  background: rgba(0, 255, 245, 0.15);
+  border: 1px solid var(--cyan);
+  border-radius: 3px;
+  padding: 0 0.3rem;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+/* ============ PICK PHASE HINTS ============ */
+
+.pick-hint {
+  font-size: 0.85rem;
+  color: var(--gray);
+  margin-top: 0.3rem;
+  width: 100%;
+}
+
+/* ============ NUMBERS INFO ============ */
+
+.numbers-info {
+  text-align: center;
+  margin-bottom: 0.3rem;
+  width: 100%;
+}
+
+.numbers-pool-label {
+  font-size: 1rem;
+  color: var(--white);
+}
+
+.numbers-pool-label strong {
+  color: var(--pink);
+  text-shadow: 0 0 6px var(--pink);
+}
+
+.numbers-pool-hint {
+  font-size: 0.85rem;
+  color: var(--gray);
+  margin-top: 0.2rem;
+}
+
 /* ============ RESPONSIVE ============ */
 
 @media (max-width: 600px) {

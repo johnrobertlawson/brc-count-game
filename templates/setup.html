@@ -31,6 +31,7 @@
       <button class="btn-neon macro-btn" data-macro="easy" onclick="applyMacro('easy')">Easy</button>
       <button class="btn-neon macro-btn active" data-macro="medium" onclick="applyMacro('medium')">Medium</button>
       <button class="btn-neon macro-btn" data-macro="hard" onclick="applyMacro('hard')">Hard</button>
+      <button class="btn-neon macro-btn" data-macro="turbo" onclick="applyMacro('turbo')" title="Easy-mode rules but only 10 seconds per round">Turbo</button>
       <button class="btn-neon macro-btn" data-macro="custom" onclick="applyMacro('custom')">Custom</button>
     </div>
 
@@ -81,6 +82,7 @@ const MACROS = {
   easy:   { timer: 60, conundrum_length: 8, conundrum_lives: true },
   medium: { timer: 45, conundrum_length: 9, conundrum_lives: false },
   hard:   { timer: 30, conundrum_length: 9, conundrum_lives: false },
+  turbo:  { timer: 10, conundrum_length: 8, conundrum_lives: true },
 };
 
 const LENGTHS = {

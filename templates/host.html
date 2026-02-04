@@ -30,8 +30,9 @@
     <div id="letter-tiles" class="tiles"></div>
     <div id="letters-timer" class="timer-display"></div>
     <div id="letters-pick" class="pick-controls">
-      <button class="btn-neon" onclick="drawLetter('vowel')">Vowel</button>
-      <button class="btn-neon" onclick="drawLetter('consonant')">Consonant</button>
+      <button class="btn-neon" onclick="drawLetter('vowel')">Vowel <span class="key-hint">V</span></button>
+      <button class="btn-neon" onclick="drawLetter('consonant')">Consonant <span class="key-hint">C</span></button>
+      <p class="pick-hint">Timer starts after the 9th letter</p>
     </div>
     <div id="letters-submit" class="submit-area hidden"></div>
     <div id="letters-results" class="results-area hidden"></div>
@@ -43,7 +44,11 @@
     <div id="numbers-target" class="target-display"></div>
     <div id="numbers-timer" class="timer-display"></div>
     <div id="numbers-pick" class="pick-controls">
-      <label>Large numbers (0-4):
+      <div class="numbers-info">
+        <div class="numbers-pool-label">Big numbers: <strong>25, 50, 75, 100</strong></div>
+        <div class="numbers-pool-hint">The rest are filled from small numbers (1&ndash;10, each appears twice)</div>
+      </div>
+      <label>How many big numbers?
         <input type="number" id="large-count" min="0" max="4" value="1" class="num-input">
       </label>
       <button class="btn-neon" onclick="drawNumbers()">Draw Numbers</button>
@@ -185,15 +190,28 @@ function showScreen(id) {
 const SPLASH_INFO = {
   letters: {
     label: 'Letters Round',
-    scoring: 'Longest word wins.<br>Score = <strong>word length</strong>. Winner gets a <strong>bonus</strong>!'
+    scoring: 'Longest word wins.<br>Score = <strong>word length</strong>. Winner gets a <strong>bonus</strong>!',
+    tips: [
+      'Write your answer on paper \u2014 no copying!',
+      'Don\'t say it out loud until the clock stops',
+      'Each drawn letter can only be used once',
+      'Timer starts when the 9th letter is picked'
+    ]
   },
   numbers: {
     label: 'Numbers Round',
-    scoring: 'Hit the target! You don\'t have to use every number.<br>Exact = <strong>10</strong> | Within 5 = <strong>7</strong> | Within 10 = <strong>5</strong> | Within 20 = <strong>3</strong>'
+    scoring: 'Hit the target! You don\'t have to use every number.<br>Exact = <strong>10</strong> | Within 5 = <strong>7</strong> | Within 10 = <strong>5</strong> | Within 20 = <strong>3</strong>',
+    tips: [
+      'Write your answer on paper \u2014 no copying!',
+      'Don\'t say it out loud until the clock stops',
+      'Each number can only be used once',
+      'Timer starts after drawing numbers'
+    ]
   },
   conundrum: {
     label: 'Conundrum',
-    scoring: 'Unscramble the anagram.<br>First to solve wins <strong>10 points</strong>!'
+    scoring: 'Unscramble the anagram.<br>First to solve wins <strong>10 points</strong>!',
+    tips: []
   }
 };
 
@@ -202,15 +220,18 @@ function showSplash(type, onDone) {
   const macro = state.settings?.macro || 'medium';
   const diffLabel = macro.charAt(0).toUpperCase() + macro.slice(1);
   const el = document.getElementById('round-splash');
+  const tipsHtml = (info.tips && info.tips.length > 0)
+    ? `<div class="splash-tips">${info.tips.map(t => `<div class="splash-tip">\u2022 ${t}</div>`).join('')}</div>`
+    : '';
   el.innerHTML = `
     <div class="splash-type">${info.label}</div>
     <div class="splash-difficulty">${diffLabel} Mode</div>
     <div class="splash-scoring">${info.scoring}</div>
+    ${tipsHtml}
     <div class="splash-hint">Click anywhere to continue</div>
   `;
   el.classList.remove('hidden');
   el.onclick = () => { dismissSplash(); onDone(); };
-  splashTimeout = setTimeout(() => { dismissSplash(); onDone(); }, 5000);
 }
 
 function dismissSplash() {
@@ -830,6 +851,17 @@ function renderRevealLetterTiles(usageMap) {
 
 // ========== UTIL ==========
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// --- Keyboard shortcuts ---
+document.addEventListener('keydown', (e) => {
+  // Only during letters picking phase (pick controls visible, no input focused)
+  const pick = document.getElementById('letters-pick');
+  if (!pick || pick.classList.contains('hidden')) return;
+  if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+  const key = e.key.toLowerCase();
+  if (key === 'v') { e.preventDefault(); drawLetter('vowel'); }
+  else if (key === 'c') { e.preventDefault(); drawLetter('consonant'); }
+});
 
 // --- Boot ---
 init();
