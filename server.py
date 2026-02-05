@@ -150,9 +150,9 @@ class GameHandler(SimpleHTTPRequestHandler):
                 candidates = conundrum_words
             word = random.choice(candidates)
             if macro == 'easy':
-                anagram = generate_easy_anagram(word)
+                anagram = generate_easy_anagram(word, keep_count=2)
             elif macro == 'medium':
-                anagram = generate_easy_anagram(word)
+                anagram = generate_easy_anagram(word, keep_count=3)
             else:
                 anagram = generate_anagram(word)
             lives_mode = game_state['settings'].get('conundrum_lives', False)

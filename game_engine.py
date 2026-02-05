@@ -291,11 +291,11 @@ def solve_numbers(numbers: list[int], target: int) -> dict:
     }
 
 
-def generate_easy_anagram(word: str) -> str:
-    """Kinder scramble: keeps 2-3 letters in their original position."""
+def generate_easy_anagram(word: str, keep_count: int = 2) -> str:
+    """Kinder scramble: keeps `keep_count` letters in their original position."""
     letters = list(word)
     n = len(letters)
-    keep = random.sample(range(n), min(3, n))
+    keep = random.sample(range(n), min(keep_count, n))
     movable = [i for i in range(n) if i not in keep]
     movable_chars = [letters[i] for i in movable]
     for _ in range(100):
