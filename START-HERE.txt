@@ -8,14 +8,20 @@ everyone else competes on paper. Based on the British TV show.
 
 ----- WINDOWS SETUP (one-time) -----
 
-1. INSTALL PYTHON (skip if already installed)
+1. CHECK IF PYTHON IS ALREADY INSTALLED
+   - Open Command Prompt (search "cmd" in Start menu)
+   - Type: python --version
+   - If you see "Python 3.x.x" -> Skip to step 3!
+   - If you see an error -> Continue to step 2
+
+2. INSTALL PYTHON (only if step 1 failed)
    - Run "python-3.12.8-amd64.exe" from this USB
    - IMPORTANT: Check "Add Python to PATH" at the bottom!
    - Click "Install Now"
+   - Close and reopen Command Prompt after installing
 
-2. INSTALL THE GAME DEPENDENCY
-   - Open Command Prompt (search "cmd" in Start menu)
-   - Type these commands:
+3. INSTALL THE GAME DEPENDENCY
+   - In Command Prompt, type these commands:
 
         cd /d "X:\brc-count-game"
         pip install jinja2
@@ -25,7 +31,14 @@ everyone else competes on paper. Based on the British TV show.
 
 ----- MAC SETUP (one-time) -----
 
-1. Python is usually pre-installed. Open Terminal and type:
+1. CHECK IF PYTHON IS INSTALLED
+   - Open Terminal (search "Terminal" in Spotlight)
+   - Type: python3 --version
+   - If you see "Python 3.x.x" -> Continue to step 2!
+   - If you see an error -> Install from python.org/downloads
+
+2. INSTALL THE GAME DEPENDENCY
+   - In Terminal, type:
 
         cd /Volumes/COUNTDOWN/brc-count-game
         pip3 install jinja2
