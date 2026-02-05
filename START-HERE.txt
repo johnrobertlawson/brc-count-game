@@ -1,0 +1,86 @@
+=====================================
+    COUNTDOWN PARTY - Quick Start
+=====================================
+
+A party game for 2+ teams! One person hosts on a TV/projector,
+everyone else competes on paper. Based on the British TV show.
+
+
+----- WINDOWS SETUP (one-time) -----
+
+1. INSTALL PYTHON (skip if already installed)
+   - Run "python-3.12.8-amd64.exe" from this USB
+   - IMPORTANT: Check "Add Python to PATH" at the bottom!
+   - Click "Install Now"
+
+2. INSTALL THE GAME DEPENDENCY
+   - Open Command Prompt (search "cmd" in Start menu)
+   - Type these commands:
+
+        cd /d "X:\brc-count-game"
+        pip install jinja2
+
+   (Replace X: with your USB drive letter, e.g., D: or E:)
+
+
+----- MAC SETUP (one-time) -----
+
+1. Python is usually pre-installed. Open Terminal and type:
+
+        cd /Volumes/COUNTDOWN/brc-count-game
+        pip3 install jinja2
+
+   (Replace COUNTDOWN with your USB drive name)
+
+
+----- STARTING THE GAME -----
+
+WINDOWS:
+   Double-click "start.bat" in the brc-count-game folder
+   -- OR --
+   Open Command Prompt and type:
+        cd /d "X:\brc-count-game"
+        python server.py
+
+MAC:
+   Double-click "start.sh" in the brc-count-game folder
+   -- OR --
+   Open Terminal and type:
+        cd /Volumes/COUNTDOWN/brc-count-game
+        ./start.sh
+
+Then open your web browser to:  http://localhost:8000
+
+
+----- HOW TO PLAY -----
+
+1. Connect laptop to TV/projector
+2. Open the game in a browser, press F11 for fullscreen
+3. Set up team names and pick a difficulty (Easy recommended!)
+4. Players write answers on paper - NO PHONES!
+
+LETTERS ROUND: Make the longest word from 9 letters
+NUMBERS ROUND: Hit the target using +, -, *, /
+CONUNDRUM: Unscramble the anagram - first to buzz wins!
+
+
+----- TROUBLESHOOTING -----
+
+"python is not recognized"
+   -> Python isn't installed or not in PATH. Reinstall and
+      check "Add Python to PATH"
+
+"pip is not recognized"
+   -> Try: python -m pip install jinja2
+
+Game won't start on Mac?
+   -> Try: python3 server.py  (note the 3)
+
+Port already in use?
+   -> Try: python server.py --port 9000
+      Then go to http://localhost:9000
+
+
+=====================================
+         Have fun! 🎉
+=====================================
